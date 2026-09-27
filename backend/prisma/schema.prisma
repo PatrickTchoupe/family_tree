@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  APPLE
+}
+enum RelationType {
+  FATHER
+  MOTHER
+  SPOUSE
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String?
+  displayName  String?
+  provider     AuthProvider @default(LOCAL)
+  providerSub  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  trees        FamilyTree[]
+  @@unique([provider, providerSub])
+}
+
+model FamilyTree {
+  id        String     @id @default(uuid())
+  ownerId   String
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  people    Person[]
+  relations Relation[]
+  @@index([ownerId])
+}
+
+// A Person is a genealogical record, not an application account/User.
+model Person {
+  id          String      @id @default(uuid())
+  treeId      String
+  firstName   String
+  lastName    String
+  birthDate   String
+  deathDate   String?
+  sex         String
+  photoUrl    String?
+  birthPlace  String?
+  deathPlace  String?
+  profession  String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  tree        FamilyTree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  events      LifeEvent[]
+  fromLinks   Relation[]  @relation("fromPerson")
+  toLinks     Relation[]  @relation("toPerson")
+  @@index([treeId])
+}
+
+model Relation {
+  id         String       @id @default(uuid())
+  treeId     String
+  fromId     String
+  toId       String
+  type       RelationType
+  tree       FamilyTree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  from       Person       @relation("fromPerson", fields: [fromId], references: [id], onDelete: Cascade)
+  to         Person       @relation("toPerson", fields: [toId], references: [id], onDelete: Cascade)
+  @@unique([treeId, fromId, toId, type])
+  @@index([treeId])
+}
+
+model LifeEvent {
+  id          String   @id @default(uuid())
+  personId    String
+  type        String
+  date        String?
+  title       String
+  place       String?
+  description String?
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  @@index([personId])
+}
